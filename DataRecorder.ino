@@ -1,14 +1,20 @@
 /*
  * References
- * https://randomnerdtutorials.com/esp32-date-time-ntp-client-server-arduino/
- * https://randomnerdtutorials.com/esp32-multiple-ds18b20-temperature-sensors/
- * https://randomnerdtutorials.com/bme280-sensor-arduino-pressure-temperature-humidity/
+ * NTP:          https://randomnerdtutorials.com/esp32-date-time-ntp-client-server-arduino/
+ * DS18B20:      https://randomnerdtutorials.com/esp32-multiple-ds18b20-temperature-sensors/
+ * BME280:       https://randomnerdtutorials.com/bme280-sensor-arduino-pressure-temperature-humidity/
+ * ESP32 pinout: https://circuits4you.com/2018/12/31/esp32-devkit-esp32-wroom-gpio-pinout/
  */
 // Librairy for WiFi connection
 #include <WiFi.h>
 
 // Librairy for the NTP server and time management
 #include <time.h>
+
+//Librairy for the SDcard reader
+#include <SPI.h>
+#include <SD.h>
+#include <FS.h>
 
 // Librairies and Communication setup for BME280
 #include <Wire.h>
@@ -38,14 +44,26 @@ int bmeP = 0;
 const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = 28800;
 const int   daylightOffset_sec = 0;
+// - SDcard
+const int chipSelect = 2;
+String CoreFileName = "QC_";
+String FileName = "";  
+String entetecsv = "time,bme-t,bme-h,bme-p,ds1,ds2,ds3";
+bool FileFound = 1;
+int Index = 1;
+File dataFile;
 
 void setup()
 {
+  pinMode(2, OUTPUT);
   Serial.begin(115200);
+  delay(10);
+  SD.begin(chipSelect);
   delay(10);
   ConnectWifi();
   TestingBME();
   TestingDS();
+  TestingSDcard();  
 }
 
 void loop()
@@ -84,12 +102,11 @@ void TestingBME()
 {
   bool status;
   status = bme.begin(0x76);
+  Serial.println("");
   if (!status) {
-    Serial.println("");
     Serial.println("Could not find the BME280 sensor, check your wiring !");
   }
   else {
-    Serial.println("");
     Serial.print("BME280 data: ");
     GetBME();
     Serial.print("T:");
@@ -101,17 +118,17 @@ void TestingBME()
     Serial.print("P:");
     Serial.print(bmeP / 100);
     Serial.println("hPa");
-      }  
+  }  
 }
 
-// Testing thge presence of any Dallas Sensors and showing their ID
+// Testing the presence of any Dallas Sensors and showing their ID
 void TestingDS()
 {
   byte i;
   byte addr[8];
+  Serial.println("");
   if (!oneW.search(addr)) {
-    Serial.println("");
-    Serial.println(" No more DS18B20.");
+    Serial.println(" End of DS18B20 search.");
     oneW.reset_search();
     delay(250);
     return;
@@ -121,6 +138,44 @@ void TestingDS()
       Serial.print(addr[i], HEX);
     }
   }
+}
+
+// Testing the presence of the SDcard reader, its type and space left on the card
+void TestingSDcard()
+{
+  Serial.println("");
+  if(!SD.begin(chipSelect)) {
+    Serial.println("SD-card mount failed!");
+    return;
+  }
+// Check the type of the loaded SD-card
+  uint8_t cardType = SD.cardType();
+  if(cardType == CARD_NONE){
+    Serial.println("No SD card attached");
+    return;
+  }
+  Serial.print("SD-card Type: ");
+  if(cardType == CARD_MMC){ Serial.println("MMC"); }
+  else if(cardType == CARD_SD){ Serial.println("SDSC"); }
+  else if(cardType == CARD_SDHC){ Serial.println("SDHC"); }
+  else { Serial.println("UNKNOWN"); }
+  Serial.printf("Space used  : %lluMB\n", SD.usedBytes() / (1024 * 1024));
+  
+// Generate the filename and test if exist, will increment the index number until it cannot find it
+  FileName = "/" + CoreFileName+String(Index) + ".csv";
+  while (SD.exists(FileName)) {
+    Serial.print(Index);
+    Serial.print(", ");
+    Index++;
+    FileName= "/" + CoreFileName+String(Index) + ".csv";
+    }
+
+// Create the filename with the correct new index value and add the header into the newly created CSV file
+  dataFile = SD.open(FileName, FILE_WRITE);
+  dataFile.println(entetecsv);
+  dataFile.close();
+  Serial.print("File written and close: ");
+  Serial.println(FileName);
 }
 
 // Get the data from  the BME280 sensor
