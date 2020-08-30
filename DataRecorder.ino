@@ -49,8 +49,7 @@ const int chipSelect = 2;
 String CoreFileName = "QC_";
 String FileName = "";  
 String entetecsv = "time,bme-t,bme-h,bme-p,ds1,ds2,ds3";
-bool FileFound = 1;
-int Index = 1;
+int SDindex = 1;
 File dataFile;
 
 void setup()
@@ -154,27 +153,25 @@ void TestingSDcard()
     Serial.println("No SD card attached");
     return;
   }
-  Serial.print("SD-card Type: ");
+  Serial.print("SD-card Type  : ");
   if(cardType == CARD_MMC){ Serial.println("MMC"); }
   else if(cardType == CARD_SD){ Serial.println("SDSC"); }
   else if(cardType == CARD_SDHC){ Serial.println("SDHC"); }
   else { Serial.println("UNKNOWN"); }
-  Serial.printf("Space used  : %lluMB\n", SD.usedBytes() / (1024 * 1024));
+  Serial.printf("Space used    : %lluMB\n", SD.usedBytes() / (1024 * 1024));
   
 // Generate the filename and test if exist, will increment the index number until it cannot find it
-  FileName = "/" + CoreFileName+String(Index) + ".csv";
+  FileName = "/" + CoreFileName+String(SDindex) + ".csv";
   while (SD.exists(FileName)) {
-    Serial.print(Index);
-    Serial.print(", ");
-    Index++;
-    FileName= "/" + CoreFileName+String(Index) + ".csv";
+    SDindex++;
+    FileName= "/" + CoreFileName+String(SDindex) + ".csv";
     }
 
 // Create the filename with the correct new index value and add the header into the newly created CSV file
   dataFile = SD.open(FileName, FILE_WRITE);
   dataFile.println(entetecsv);
   dataFile.close();
-  Serial.print("File written and close: ");
+  Serial.print("New File ready: ");
   Serial.println(FileName);
 }
 
